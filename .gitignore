@@ -1,0 +1,4 @@
+/target
+/t
+.direnv/
+.envrc
