@@ -1,36 +1,29 @@
 {
   inputs = {
     nixpkgs.url      = "github:nixos/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url  = "github:numtide/flake-utils";
     naersk.url       = "github:nix-community/naersk";
+    naersk.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, naersk }:
+  outputs = { self, nixpkgs, flake-utils, naersk }:
     flake-utils.lib.eachDefaultSystem (system:
       let 
         packageName = "classified";
-
-        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
-          inherit system overlays;
+          inherit system;
         };
-        rust = (pkgs.rust-bin.stable.latest.default.override {
-          extensions = [
-            "rust-src"
-            "cargo"
-            "rustc"
-            "rustfmt"
-          ];
-        });
-        naersk-lib = naersk.lib."${system}".override {
-          cargo = rust;
-          rustc = rust;
-        };
+        naersk-lib = naersk.lib."${system}";
       in rec {
         packages.${packageName} = naersk-lib.buildPackage {
           pname = "${packageName}";
           root = ./.;
+          postInstall = ''
+            mkdir -p $out/share/{bash-completion/completions,zsh/site-functions,fish/vendor_completions.d}
+            $out/bin/classified completions bash > $out/share/bash-completion/completions/classified.bash
+            $out/bin/classified completions zsh > $out/share/zsh/site-functions/_classified
+            $out/bin/classified completions fish > $out/share/fish/vendor_completions.d/classified.fish
+          '';
         };
         defaultPackage = packages.${packageName};
 
@@ -40,9 +33,11 @@
         nixosModules.default = import ./module.nix defaultApp;
 
         devShell = pkgs.mkShell {
-          buildInputs = [
-            rust
-            pkgs.rust-analyzer
+          buildInputs = with pkgs;[
+            rustc
+            cargo
+            rustfmt
+            rust-analyzer
           ];
         };
       }

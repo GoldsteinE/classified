@@ -33,7 +33,7 @@ use chacha20poly1305::{
     aead::{Aead as _, Key, Nonce},
     AeadCore, KeyInit as _, XChaCha20Poly1305 as Cipher,
 };
-use clap::Parser;
+use clap::{CommandFactory as _, Parser, Subcommand};
 use color_eyre::eyre::{self, eyre, WrapErr as _};
 use indexmap::IndexMap;
 use itertools::Itertools as _;
@@ -45,12 +45,33 @@ use crate::config::{Config, FileDesc};
 mod config;
 mod keyarmor;
 
+#[derive(Subcommand)]
+enum Shell {
+    Bash,
+    Zsh,
+    Fish,
+}
+
+impl From<Shell> for clap_complete::Shell {
+    fn from(this: Shell) -> Self {
+        match this {
+            Shell::Bash => Self::Bash,
+            Shell::Zsh => Self::Zsh,
+            Shell::Fish => Self::Fish,
+        }
+    }
+}
+
+#[allow(clippy::doc_markdown)]
+/// Simple encryption tool intended for use with NixOS
 #[derive(Parser)]
 enum Command {
     /// Generate a new encryption key and print it to stdout
+    #[clap(display_order = 1)]
     GenKey,
     /// Encrypt file or stdin with given encryption key and print result to stdout (armored as
     /// base64)
+    #[clap(display_order = 2)]
     Encrypt {
         /// Path to the key file
         #[clap(short, long)]
@@ -58,6 +79,7 @@ enum Command {
         /// File to encrypt, stdin if absent
         file: Option<PathBuf>,
     },
+    #[clap(display_order = 3)]
     /// Decrypt file that was previously encrypted with `encrypt` and print result to stdout
     Decrypt {
         /// Path to the key file
@@ -66,11 +88,16 @@ enum Command {
         /// File to decrypt, stdin if absent
         file: Option<PathBuf>,
     },
+    #[clap(display_order = 4)]
     /// Decrypt multiple files to their target directories, according to JSON/TOML config
     Batch {
         /// Config file, stdin if absent
         config: Option<PathBuf>,
     },
+    #[clap(display_order = 5)]
+    /// Generate shell completions
+    #[clap(subcommand)]
+    Completions(Shell),
 }
 
 fn trim_newline(mut x: &[u8]) -> &[u8] {
@@ -228,6 +255,14 @@ fn main() -> eyre::Result<()> {
                 file.create(&path, &contents)?;
                 contents.zeroize();
             }
+        }
+        Command::Completions(shell) => {
+            clap_complete::generate(
+                clap_complete::Shell::from(shell),
+                &mut Command::command(),
+                "classified",
+                &mut io::stdout().lock(),
+            );
         }
     }
 

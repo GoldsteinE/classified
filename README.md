@@ -18,7 +18,7 @@ Use a simple encryption program and put the config into a NixOS module. Just lik
 	  url = "github:GoldsteinE/classified";
 	  # to avoid having one more copy of nixpkgs
 	  inputs.nixpkgs.follows = "nixpkgs";
-	  # you can also do this with rust-overlay and naersk
+	  # you can also do this with naersk
 	};
   };
   outputs = { nixpkgs, classified, ... }: {
