@@ -1,5 +1,6 @@
 // lint me harder
 #![forbid(non_ascii_idents)]
+#![forbid(unsafe_code)]
 #![deny(
     future_incompatible,
     keyword_idents,
@@ -22,8 +23,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    fmt::{self},
-    fs,
+    fmt, fs,
     io::{self, Read as _, Write as _},
     ops::Deref,
     path::{Path, PathBuf},
@@ -38,6 +38,7 @@ use color_eyre::eyre::{self, eyre, WrapErr as _};
 use indexmap::IndexMap;
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroize as _;
 
 use crate::config::{Config, FileDesc};
 
@@ -150,6 +151,12 @@ impl Deref for ArmoredKey {
     }
 }
 
+impl Drop for ArmoredKey {
+    fn drop(&mut self) {
+        self.inner.zeroize();
+    }
+}
+
 fn main() -> eyre::Result<()> {
     color_eyre::install()?;
 
@@ -162,7 +169,7 @@ fn main() -> eyre::Result<()> {
         Command::Encrypt { key, file } => {
             let cipher = Cipher::new(&*ArmoredKey::from_file(&key)?);
             let nonce = Cipher::generate_nonce(&mut rng);
-            let plaintext = maybe_stdin(file.as_deref())?;
+            let mut plaintext = maybe_stdin(file.as_deref())?;
             let bytes = cipher
                 .encrypt(&nonce, plaintext.as_slice())
                 .map_err(|_| eyre!("failed to encrypt"))?;
@@ -171,16 +178,18 @@ fn main() -> eyre::Result<()> {
             let mut out = io::stdout().lock();
             out.write_all(base64::encode(cbor.as_slice()).as_bytes())?;
             out.write_all(b"\n")?;
+            plaintext.zeroize();
         }
         Command::Decrypt { key, file } => {
             let cipher = Cipher::new(&*ArmoredKey::from_file(&key)?);
             let armored = maybe_stdin(file.as_deref())?;
-            let decrypted = decrypt(
+            let mut decrypted = decrypt(
                 file.as_deref().unwrap_or_else(|| "-".as_ref()),
                 &cipher,
                 &armored,
             )?;
             io::stdout().write_all(&decrypted)?;
+            decrypted.zeroize();
         }
         Command::Batch { config } => {
             let config = Config::parse(&maybe_stdin(config.as_deref())?)?;
@@ -214,9 +223,10 @@ fn main() -> eyre::Result<()> {
                 })
                 .collect::<eyre::Result<_>>()?;
 
-            for (file, name, contents) in decrypted {
+            for (file, name, mut contents) in decrypted {
                 let path = config.target_dir.join(name);
                 file.create(&path, &contents)?;
+                contents.zeroize();
             }
         }
     }

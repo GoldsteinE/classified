@@ -1,6 +1,7 @@
 use bitvec::{array::BitArray, order::Msb0};
-use color_eyre::eyre::{self, eyre, ensure};
+use color_eyre::eyre::{self, ensure, eyre};
 use crc_any::CRCu8;
+use zeroize::Zeroize as _;
 
 pub struct Words {
     inner: BitArray<[u8; 33], Msb0>,
@@ -54,6 +55,12 @@ impl Words {
         ensure!(crc.get_crc() == arr[32], "wrong key CRC8");
 
         Ok(Self { inner })
+    }
+}
+
+impl Drop for Words {
+    fn drop(&mut self) {
+        self.inner.as_raw_mut_slice().zeroize();
     }
 }
 
