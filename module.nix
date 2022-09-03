@@ -72,7 +72,7 @@ in
 
   config = {
     environment.systemPackages = [ classified ];
-  } ++ (if cfg.keys != { } then {
+  } ++ (if cfg.files != { } then assert cfg.keys != { }; {
     systemd.services.classified = {
       wantedBy = [ "multi-user.target" ];
       restartTriggers = [ jsonConfig ];
@@ -89,5 +89,5 @@ in
       before = [ "classified.service" ];
       partOf = [ "classified.service" ];
     }];
-  } else assert cfg.files == {}; { });
+  } else { });
 }
