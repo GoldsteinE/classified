@@ -14,7 +14,6 @@
     clippy::empty_line_after_outer_attr,
     clippy::panic,
     clippy::unwrap_used,
-    clippy::expect_used,
     clippy::redundant_field_names,
     clippy::rest_pat_in_fully_bound_structs,
     clippy::unneeded_field_pattern,
@@ -23,7 +22,7 @@
 #![warn(clippy::pedantic)]
 
 use std::{
-    fmt::{self, Write as _},
+    fmt::{self},
     fs,
     io::{self, Read as _, Write as _},
     ops::Deref,
@@ -32,16 +31,18 @@ use std::{
 
 use chacha20poly1305::{
     aead::{Aead as _, Key, Nonce},
-    AeadCore, KeyInit as _, KeySizeUser as _, XChaCha20Poly1305 as Cipher,
+    AeadCore, KeyInit as _, XChaCha20Poly1305 as Cipher,
 };
 use clap::Parser;
-use color_eyre::eyre::{self, ensure, eyre, WrapErr as _};
+use color_eyre::eyre::{self, eyre, WrapErr as _};
 use indexmap::IndexMap;
+use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, FileDesc};
 
 mod config;
+mod keyarmor;
 
 #[derive(Parser)]
 enum Command {
@@ -90,14 +91,14 @@ fn maybe_stdin(file: Option<&Path>) -> eyre::Result<Vec<u8>> {
     }
 }
 
-fn decrypt(cipher: &Cipher, armored: &[u8]) -> eyre::Result<Vec<u8>> {
+fn decrypt(filename: impl fmt::Debug, cipher: &Cipher, armored: &[u8]) -> eyre::Result<Vec<u8>> {
     let encrypted_bytes =
         base64::decode(trim_newline(armored)).wrap_err("failed to unarmor encrypted file")?;
     let encrypted: Encrypted = serde_cbor::from_slice(&encrypted_bytes)
         .wrap_err("failed to deserialize encrypted file")?;
     cipher
         .decrypt(&encrypted.nonce, &*encrypted.bytes)
-        .map_err(|_| eyre!("failed to decrypt"))
+        .map_err(|_| eyre!("failed to decrypt {filename:?}"))
 }
 
 #[derive(Deserialize, Serialize)]
@@ -112,20 +113,31 @@ struct ArmoredKey {
 
 impl fmt::Display for ArmoredKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(base64::encode(self.inner.as_slice()).as_str())?;
-        f.write_char('\n')
+        write!(
+            f,
+            "{}",
+            keyarmor::Words::new(self.inner.into()).words().format(" ")
+        )
     }
 }
 
 impl ArmoredKey {
+    fn new(inner: Key<Cipher>) -> Self {
+        Self { inner }
+    }
+
     fn from_file(path: &Path) -> eyre::Result<Self> {
-        let bytes = base64::decode(trim_newline(
-            &fs::read(path).wrap_err("failed to read key file")?,
-        ))
-        .wrap_err("failed to decode key from base64")?;
-        ensure!(bytes.len() == Cipher::key_size(), "invalid key length");
+        let armored = fs::read_to_string(path).wrap_err("failed to read key file")?;
+        let words: Vec<_> = armored.split_whitespace().collect();
+        let bytes = keyarmor::Words::from_words(
+            &words
+                .try_into()
+                .map_err(|v: Vec<_>| eyre!("wrong number of words: {} instead of 24", v.len()))?,
+        )
+        .wrap_err("failed to decode key")?
+        .bytes();
         Ok(Self {
-            inner: *Key::<Cipher>::from_slice(&bytes),
+            inner: Key::<Cipher>::from(bytes),
         })
     }
 }
@@ -144,10 +156,8 @@ fn main() -> eyre::Result<()> {
     let mut rng = rand::thread_rng();
     match Command::parse() {
         Command::GenKey => {
-            let key = Cipher::generate_key(rng);
-            let mut out = io::stdout().lock();
-            out.write_all(base64::encode(key.as_slice()).as_bytes())?;
-            out.write_all(b"\n")?;
+            let key = ArmoredKey::new(Cipher::generate_key(rng));
+            println!("{key}");
         }
         Command::Encrypt { key, file } => {
             let cipher = Cipher::new(&*ArmoredKey::from_file(&key)?);
@@ -165,7 +175,7 @@ fn main() -> eyre::Result<()> {
         Command::Decrypt { key, file } => {
             let cipher = Cipher::new(&*ArmoredKey::from_file(&key)?);
             let armored = maybe_stdin(file.as_deref())?;
-            let decrypted = decrypt(&cipher, &armored)?;
+            let decrypted = decrypt(file.as_deref().unwrap_or("-".as_ref()), &cipher, &armored)?;
             io::stdout().write_all(&decrypted)?;
         }
         Command::Batch { config } => {
@@ -191,7 +201,8 @@ fn main() -> eyre::Result<()> {
                             .ok_or_else(|| eyre!("key {key:?} is not configured"))?,
                         None => keys.first().ok_or_else(|| eyre!("no keys specified"))?.1,
                     };
-                    let decrypted = decrypt(cipher, &maybe_stdin(Some(&file.encrypted))?)?;
+                    let decrypted =
+                        decrypt(&file.encrypted, cipher, &maybe_stdin(Some(&file.encrypted))?)?;
                     Ok((file, name.as_str(), decrypted))
                 })
                 .collect::<eyre::Result<_>>()?;
