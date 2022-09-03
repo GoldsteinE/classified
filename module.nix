@@ -2,7 +2,8 @@ classified: { config, pkgs, ... }:
 
 let
   cfg = config.classified;
-  enabled = assert cfg.files != { } -> cfg.keys != { }; cfg.files != { };
+  # enabled = assert cfg.files != { } -> cfg.keys != { }; cfg.files != { };
+  enabled = true;
   jsonConfig = builtins.toFile "classified.json" (builtins.toJSON cfg);
 
 in
