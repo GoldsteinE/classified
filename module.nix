@@ -73,7 +73,7 @@ in
 
   config = {
     environment.systemPackages = [ classified ];
-  } ++ (if enabled then {
+  } // (if enabled then {
     systemd.services.classified = {
       wantedBy = [ "multi-user.target" ];
       restartTriggers = [ jsonConfig ];
