@@ -15,21 +15,21 @@ Use a simple encryption program and put the config into a NixOS module. Just lik
 {
   inputs = {
     classified = {
-	  url = "github:GoldsteinE/classified";
-	  # to avoid having one more copy of nixpkgs
-	  inputs.nixpkgs.follows = "nixpkgs";
-	  # you can also do this with naersk
-	};
+      url = "github:GoldsteinE/classified";
+      # to avoid having one more copy of nixpkgs
+      inputs.nixpkgs.follows = "nixpkgs";
+      # you can also do this with naersk
+    };
   };
   outputs = { nixpkgs, classified, ... }: {
     nixosConfigurations.your-hostname = nixpkgs.lib.nixosSystem rec {
-	  system = "x86_64-linux";
+      system = "x86_64-linux";
       modules = [
-	    # other modules here
-		./configuration.nix
-		classified.nixosModules."${system}".default
-	  ];
-	};
+        # other modules here
+        ./configuration.nix
+        classified.nixosModules."${system}".default
+      ];
+    };
   };
 }
 ```
@@ -39,26 +39,26 @@ and then
 ```nix
 # configuration.nix
 {
-   classified = {
-     # Default is `/var/secrets`
-	 targetDir = "/var/classfied";
-	 keys = {
-	   first = "/path/to/first.key";
-	   second = "/path/to/second.key";
-	 };
-	 files = {
-	   top-secret = {
-	     # You can omit the `key` attribute if you have exactly one key configured
-	     key = "first";
-		 encrypted = ./encrypted-file;
-		 # Default is `400`
-		 mode = "440";
-		 # Defaults are `root:root`
-		 user = "nginx";
-		 group = "nogroup";
-	   };
-	 };
+ classified = {
+   # Default is `/var/secrets`
+   targetDir = "/var/classfied";
+   keys = {
+     first = "/path/to/first.key";
+     second = "/path/to/second.key";
    };
+   files = {
+     top-secret = {
+       # You can omit the `key` attribute if you have exactly one key configured
+       key = "first";
+       encrypted = ./encrypted-file;
+       # Default is `400`
+       mode = "440";
+       # Defaults are `root:root`
+       user = "nginx";
+       group = "nogroup";
+     };
+   };
+ };
 }
 ```
 
