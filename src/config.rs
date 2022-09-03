@@ -14,7 +14,7 @@ use nix::{
     sys::stat::{fchmod, Mode},
     unistd::{fchown, Gid, Group, Uid, User},
 };
-use serde::Deserialize;
+use serde::{de::Error as _, Deserialize, Deserializer};
 
 fn default_mode() -> u32 {
     0o400
@@ -28,12 +28,32 @@ fn default_group() -> Either<u32, String> {
     Either::Left(Gid::current().as_raw())
 }
 
+fn deserialize_mode<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper<'a> {
+        Num(u32),
+        String(&'a str),
+    }
+
+    match Helper::deserialize(deserializer)? {
+        Helper::Num(num) => Ok(num),
+        Helper::String(s) => match u32::from_str_radix(s, 8) {
+            Ok(num) => Ok(num),
+            Err(_) => Err(D::Error::invalid_value(
+                serde::de::Unexpected::Str(s),
+                &"an octal number",
+            )),
+        },
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct FileDesc {
     pub key: Option<String>,
     #[serde(default)]
     pub encrypted: PathBuf,
-    #[serde(default = "default_mode")]
+    #[serde(default = "default_mode", deserialize_with = "deserialize_mode")]
     pub mode: u32,
     #[serde(with = "either::serde_untagged", default = "default_user")]
     pub user: Either<u32, String>,
@@ -85,6 +105,7 @@ impl FileDesc {
 
         let mut file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .mode(0o200)
             .open(path)
@@ -106,6 +127,7 @@ impl FileDesc {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    #[serde(alias = "targetDir")]
     pub target_dir: PathBuf,
     pub keys: IndexMap<String, PathBuf>,
     #[serde(default)]

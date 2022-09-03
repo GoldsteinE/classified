@@ -9,7 +9,7 @@
   outputs = { self, nixpkgs, rust-overlay, flake-utils, naersk }:
     flake-utils.lib.eachDefaultSystem (system:
       let 
-        packageName = "INSERT_NAME_HERE";
+        packageName = "classified";
 
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
@@ -36,6 +36,8 @@
 
         apps.${packageName} = packages.${packageName};
         defaultApp = apps.${packageName};
+
+        nixosModules.default = import ./module.nix defaultApp;
 
         devShell = pkgs.mkShell {
           buildInputs = [

@@ -46,7 +46,7 @@ mod keyarmor;
 
 #[derive(Parser)]
 enum Command {
-    /// Generate a new encryption key and print it to stdout (armored as base64)
+    /// Generate a new encryption key and print it to stdout
     GenKey,
     /// Encrypt file or stdin with given encryption key and print result to stdout (armored as
     /// base64)
@@ -175,7 +175,11 @@ fn main() -> eyre::Result<()> {
         Command::Decrypt { key, file } => {
             let cipher = Cipher::new(&*ArmoredKey::from_file(&key)?);
             let armored = maybe_stdin(file.as_deref())?;
-            let decrypted = decrypt(file.as_deref().unwrap_or("-".as_ref()), &cipher, &armored)?;
+            let decrypted = decrypt(
+                file.as_deref().unwrap_or_else(|| "-".as_ref()),
+                &cipher,
+                &armored,
+            )?;
             io::stdout().write_all(&decrypted)?;
         }
         Command::Batch { config } => {
@@ -201,8 +205,11 @@ fn main() -> eyre::Result<()> {
                             .ok_or_else(|| eyre!("key {key:?} is not configured"))?,
                         None => keys.first().ok_or_else(|| eyre!("no keys specified"))?.1,
                     };
-                    let decrypted =
-                        decrypt(&file.encrypted, cipher, &maybe_stdin(Some(&file.encrypted))?)?;
+                    let decrypted = decrypt(
+                        &file.encrypted,
+                        cipher,
+                        &maybe_stdin(Some(&file.encrypted))?,
+                    )?;
                     Ok((file, name.as_str(), decrypted))
                 })
                 .collect::<eyre::Result<_>>()?;
