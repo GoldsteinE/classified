@@ -1,7 +1,8 @@
 classified: { config, pkgs, ... }:
 
-let cfg = config.classified;
-    jsonConfig = builtins.toFile "classified.json" (builtins.toJSON cfg);
+let
+  cfg = config.classified;
+  jsonConfig = builtins.toFile "classified.json" (builtins.toJSON cfg);
 
 in
 {
@@ -18,6 +19,7 @@ in
 
         These files should belong to root:root and have permissions 400 or 600.
       '';
+      default = { };
     };
     files = mkOption {
       type = types.attrsOf (types.submodule {
@@ -70,6 +72,7 @@ in
 
   config = {
     environment.systemPackages = [ classified ];
+  } ++ (if cfg.keys != { } then {
     systemd.services.classified = {
       wantedBy = [ "multi-user.target" ];
       restartTriggers = [ jsonConfig ];
@@ -86,5 +89,5 @@ in
       before = [ "classified.service" ];
       partOf = [ "classified.service" ];
     }];
-  };
+  } else assert cfg.files == {}; { });
 }
