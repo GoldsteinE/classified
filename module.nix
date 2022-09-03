@@ -2,6 +2,7 @@ classified: { config, pkgs, ... }:
 
 let
   cfg = config.classified;
+  enabled = assert cfg.files != { } -> cfg.keys != { }; cfg.files != { };
   jsonConfig = builtins.toFile "classified.json" (builtins.toJSON cfg);
 
 in
@@ -72,7 +73,7 @@ in
 
   config = {
     environment.systemPackages = [ classified ];
-  } ++ (if cfg.files != { } then assert cfg.keys != { }; {
+  } ++ (if enabled then {
     systemd.services.classified = {
       wantedBy = [ "multi-user.target" ];
       restartTriggers = [ jsonConfig ];
