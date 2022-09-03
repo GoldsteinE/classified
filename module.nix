@@ -2,8 +2,8 @@ classified: { config, pkgs, ... }:
 
 let
   cfg = config.classified;
-  # enabled = assert cfg.files != { } -> cfg.keys != { }; cfg.files != { };
-  enabled = true;
+  enabled = assert cfg.files != { } -> cfg.keys != { }; cfg.files != { };
+  ifEnabled = alt: x: if enabled then x else alt;
   jsonConfig = builtins.toFile "classified.json" (builtins.toJSON cfg);
 
 in
@@ -74,8 +74,7 @@ in
 
   config = {
     environment.systemPackages = [ classified ];
-  } // (if enabled then {
-    systemd.services.classified = {
+    systemd.services.classified = ifEnabled { } {
       wantedBy = [ "multi-user.target" ];
       restartTriggers = [ jsonConfig ];
       script = ''
@@ -83,7 +82,7 @@ in
         ${pkgs.coreutils}/bin/sleep inf
       '';
     };
-    systemd.mounts = [{
+    systemd.mounts = ifEnabled [ ] [{
       what = "tmpfs";
       type = "tmpfs";
       where = cfg.targetDir;
@@ -91,5 +90,5 @@ in
       before = [ "classified.service" ];
       partOf = [ "classified.service" ];
     }];
-  } else { });
+  };
 }
