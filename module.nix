@@ -75,10 +75,12 @@ in
   config = {
     environment.systemPackages = [ classified ];
     systemd.services.classified = ifEnabled { } {
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = [ "basic.target" ];
       restartTriggers = [ jsonConfig ];
+      serviceConfig.Type = "notify";
       script = ''
         ${classified}/bin/classified batch ${jsonConfig}
+        ${pkgs.systemd}/bin/systemd-notify --ready
         ${pkgs.coreutils}/bin/sleep inf
       '';
     };
