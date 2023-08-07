@@ -9,7 +9,6 @@
     noop_method_call,
     pointer_structural_match,
     unused_lifetimes,
-    unused_qualifications,
     clippy::wildcard_dependencies,
     clippy::debug_assert_with_mut_call,
     clippy::empty_line_after_outer_attr,
