@@ -33,9 +33,10 @@
         nixosModules.default = import ./module.nix defaultApp;
 
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs;[
+          buildInputs = with pkgs; [
             rustc
             cargo
+            clippy
             rustfmt
             rust-analyzer
           ];

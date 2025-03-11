@@ -7,7 +7,6 @@
     elided_lifetimes_in_paths,
     meta_variable_misuse,
     noop_method_call,
-    pointer_structural_match,
     unused_lifetimes,
     clippy::wildcard_dependencies,
     clippy::debug_assert_with_mut_call,
