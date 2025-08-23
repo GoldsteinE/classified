@@ -40,7 +40,10 @@ and then
 # configuration.nix
 {
  classified = {
-   # Default is `/var/secrets`
+   # Default is `/var/secrets`.
+   # Note that this should be an empty directory:
+   # while the service is running, all the files in that directory
+   # will be masked by the tmpfs mount and not accessible.
    targetDir = "/var/classfied";
    keys = {
      first = "/path/to/first.key";
