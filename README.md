@@ -49,6 +49,8 @@ and then
      first = "/path/to/first.key";
      second = "/path/to/second.key";
    };
+   # Do you need to spawn a separate systemd service for each file? Defaults to false
+   multipleServices = true;
    files = {
      top-secret = {
        # You can omit the `key` attribute if you have exactly one key configured
@@ -59,6 +61,8 @@ and then
        # Defaults are `root:root`
        user = "nginx";
        group = "nogroup";
+       # What systemd services should wait for this file to appear; defaults to []
+       before = [ "one.service" "two.service" ];
      };
    };
  };
